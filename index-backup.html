@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Repo Battle Arena</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d0b1e;color:#eee;font-family:system-ui,sans-serif;text-align:center;padding:16px}
+h1{font-family:"Courier New",monospace;color:#ffd23f;letter-spacing:2px;margin:8px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+input,select,button{padding:10px;border-radius:8px;border:2px solid #3a3470;background:#18153a;color:#fff;font-size:15px}
+input{width:240px}button{background:#ff3864;border-color:#ff3864;font-weight:700;cursor:pointer}button:disabled{opacity:.5}
+.arena{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:900px;margin:auto}
+.card{flex:1;min-width:280px;background:#18153a;border:2px solid #3a3470;border-radius:14px;padding:14px;transition:.2s}
+.card img{width:64px;height:64px;border-radius:50%}.card h3{margin:6px 0;font-size:16px;word-break:break-all}
+.hpwrap{background:#000;border-radius:6px;height:16px;overflow:hidden}.hp{height:100%;width:100%;background:#3ddc84;transition:width .6s,background .6s}
+.stat{display:flex;justify-content:space-between;font-size:13px;margin:4px 0;color:#bbb}
+.hit{animation:shake .4s}.win{border-color:#ffd23f;box-shadow:0 0 24px #ffd23f88}.dead{opacity:.45;filter:grayscale(1)}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#log{max-width:700px;margin:16px auto;text-align:left}.line{padding:8px 12px;margin:6px 0;background:#18153a;border-left:4px solid #ff3864;border-radius:6px;animation:in .3s}
+.crit{border-color:#ffd23f}@keyframes in{from{opacity:0;transform:translateY(8px)}}
+#banner{font-size:26px;color:#ffd23f;font-family:monospace;margin:12px}.err{color:#ff6b6b}small{color:#888}
+</style></head><body>
+<h1>⚔️ REPO BATTLE ARENA ⚔️</h1>
+<div class="bar">
+<input id="a" value="torvalds/linux" placeholder="owner/repo or URL"><input id="b" value="python/cpython" placeholder="owner/repo or URL">
+<select id="style"><option value="pokemon">Pokémon announcer</option><option value="cricket">Cricket commentator</option>
+<option value="anime">Anime narrator</option><option value="shakespeare">Shakespeare</option><option value="wrestling">Wrestling</option></select>
+<button id="go">FIGHT!</button></div>
+<div id="msg"></div><div class="arena" id="arena"></div><div id="banner"></div><div id="log"></div><small id="src"></small>
+<script>
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const card=(f,i)=>`<div class="card" id="c${i}"><img src="${f.avatar}"><h3>${f.icon} ${f.name}</h3><div>${f.type} type · ${f.language}</div>
+<div class="hpwrap"><div class="hp" id="hp${i}"></div></div><div class="stat" id="hpt${i}"><span>HP</span><b>${f.hp}</b></div>
+<div class="stat"><span>⚔️ Attack (${f.raw.commits_30d} commits/30d)</span><b>${f.attack}</b></div>
+<div class="stat"><span>🛡️ Defense (${f.raw.closed_issues} closed issues)</span><b>${f.defense}</b></div>
+<div class="stat"><span>💨 Speed (pushed ${f.raw.days_since_push}d ago)</span><b>${f.speed}</b></div>
+<div class="stat"><span>⭐ Stars → HP</span><b>${f.raw.stars.toLocaleString()}</b></div></div>`;
+$("go").onclick=async()=>{
+  $("go").disabled=true;["msg","arena","banner","log","src"].forEach(i=>$(i).innerHTML="");$("msg").textContent="Summoning fighters...";
+  try{
+    const q=new URLSearchParams({a:$("a").value,b:$("b").value,style:$("style").value});
+    const d=await (await fetch("/api/battle?"+q)).json();
+    if(d.error)throw new Error(d.error);
+    $("msg").textContent="";$("arena").innerHTML=card(d.a,0)+card(d.b,1);
+    const F=[d.a,d.b],say=t=>{const e=document.createElement("div");e.className="line";e.textContent=t;return e};
+    $("log").append(say("🎤 "+d.story.intro));await sleep(1500);
+    for(let n=0;n<d.events.length;n++){
+      const e=d.events[n],t=F[0].name===e.defender?0:1;
+      $("hp"+t).style.width=(e.hp[t]/F[t].hp*100)+"%";$("hp"+t).style.background=e.hp[t]/F[t].hp<.3?"#ff3864":"#3ddc84";
+      $("hpt"+t).lastChild.textContent=e.hp[t];$("c"+t).classList.add("hit");setTimeout(()=>$("c"+t).classList.remove("hit"),400);
+      const l=say(`R${e.round} · -${e.damage}${e.crit?" 💥CRIT":""} — `+d.story.lines[n]);if(e.crit)l.classList.add("crit");
+      $("log").append(l);l.scrollIntoView({behavior:"smooth",block:"center"});await sleep(1700);
+    }
+    const w=d.winner===F[0].name?0:1;$("c"+w).classList.add("win");$("c"+(1-w)).classList.add("dead");
+    $("banner").textContent="🏆 "+d.winner+" WINS!";$("log").append(say("🎤 "+d.story.outro));
+    $("src").textContent="Winner decided by code · narration: "+(d.story.source==="ai"?"AI":"template fallback (set ANTHROPIC_API_KEY)");
+  }catch(e){$("msg").innerHTML=`<span class="err">${e.message}</span>`}
+  $("go").disabled=false;
+};
+</script></body></html>
